@@ -5,13 +5,331 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Card Game Platform</title>
 <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5; }
-    code { background: #f0f0f0; padding: 0.1rem 0.35rem; border-radius: 4px; }
+    :root { --bg:#14161f; --panel:#1e2230; --panel2:#262b3d; --text:#e8eaf2; --muted:#9aa0b4; --accent:#5b8cff; --danger:#ff6b6b; --ok:#52c47a; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+    .hidden { display:none !important; }
+    .view { max-width:860px; margin:0 auto; padding:1.5rem; }
+    h1 { font-size:1.4rem; margin:0 0 1rem; }
+    button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:0.45rem 0.8rem; cursor:pointer; font-size:0.9rem; }
+    button.secondary { background:var(--panel2); color:var(--text); }
+    button.danger { background:var(--danger); }
+    button:disabled { opacity:0.4; cursor:not-allowed; }
+    input[type="text"] { background:var(--panel2); border:1px solid #343a52; color:var(--text); border-radius:6px; padding:0.5rem 0.6rem; font-size:0.95rem; }
+    #view-connect { display:flex; flex-direction:column; gap:0.8rem; align-items:flex-start; }
+    .lobby-grid { display:grid; grid-template-columns:240px 1fr; gap:1rem; }
+    @media (max-width:640px){ .lobby-grid{ grid-template-columns:1fr; } }
+    .panel { background:var(--panel); border-radius:10px; padding:1rem; }
+    .panel h2 { font-size:1rem; margin:0 0 0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
+    #roster-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:0.5rem; }
+    #roster-list li { display:flex; align-items:center; gap:0.5rem; }
+    #roster-list .name { flex:1; overflow:hidden; text-overflow:ellipsis; }
+    .badge { font-size:0.7rem; color:var(--muted); background:var(--panel2); padding:0.15rem 0.4rem; border-radius:20px; }
+    .badge.in-game { color:var(--ok); }
+    #chat-log { height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:0.35rem; padding:0.5rem; background:var(--panel2); border-radius:8px; }
+    .chat-msg { font-size:0.9rem; }
+    .chat-msg .from { font-weight:600; }
+    .chat-msg.system { color:var(--muted); }
+    .chat-msg.result { color:var(--ok); }
+    #chat-form { display:flex; gap:0.5rem; margin-top:0.6rem; }
+    #chat-input { flex:1; }
+    #invite-toast { position:fixed; top:1rem; right:1rem; background:var(--panel2); border:1px solid var(--accent); border-radius:10px; padding:1rem; box-shadow:0 8px 30px rgba(0,0,0,0.5); display:flex; flex-direction:column; gap:0.6rem; max-width:320px; }
+    .game-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem; }
+    #turn-indicator { font-weight:600; }
+    #winner-banner { text-align:center; font-size:1.2rem; font-weight:700; color:var(--ok); margin:0.75rem 0; }
+    #board { display:grid; gap:0.5rem; }
+    .card { aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:1.6rem; border-radius:8px; user-select:none; background:linear-gradient(145deg,#343b57,#262c44); color:var(--muted); cursor:default; transition:transform 0.1s ease; }
+    .card.flippable { cursor:pointer; }
+    .card.flippable:hover { transform:scale(1.04); }
+    .card.faceup { background:#f2f4fb; color:#111; }
+    .card.matched { background:var(--ok); color:#fff; opacity:0.75; }
 </style>
 </head>
 <body>
-<h1>Card Game Platform</h1>
-<p>The WebSocket server is running.</p>
-<p>Connect to <code>ws://127.0.0.1:8080/ws?name=YourName</code> to enter the lobby.</p>
+    <div id="view-connect" class="view">
+        <h1>Card Game Platform</h1>
+        <p>Enter a name to join the lobby.</p>
+        <input id="name-input" type="text" placeholder="Your name" maxlength="24">
+        <button id="connect-btn">Connect</button>
+        <p id="connect-status" class="chat-msg system"></p>
+    </div>
+
+    <div id="view-lobby" class="view hidden">
+        <div class="lobby-grid">
+            <div class="panel">
+                <h2>Players</h2>
+                <ul id="roster-list"></ul>
+                <p id="lobby-me" style="margin-top:0.8rem;color:var(--muted);font-size:0.85rem;"></p>
+            </div>
+            <div class="panel">
+                <h2>Lobby chat</h2>
+                <div id="chat-log"></div>
+                <form id="chat-form">
+                    <input id="chat-input" type="text" placeholder="Type a message…" autocomplete="off">
+                    <button type="submit">Send</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-game" class="view hidden">
+        <div class="game-header">
+            <span id="game-title"></span>
+            <span id="turn-indicator"></span>
+            <span id="scoreboard"></span>
+            <button id="leave-btn" class="secondary">Leave game</button>
+        </div>
+        <div id="winner-banner" class="hidden"></div>
+        <div id="board"></div>
+    </div>
+
+    <div id="invite-toast" class="hidden">
+        <span id="invite-text"></span>
+        <div style="display:flex;gap:0.5rem;">
+            <button id="invite-accept">Accept</button>
+            <button id="invite-decline" class="danger">Decline</button>
+        </div>
+    </div>
+
+<script>
+(function () {
+    'use strict';
+
+    var EMOJI = ['🍎', '🍌', '🍇', '🍓', '🍒', '🍑', '🥝', '🍍', '🍋', '🍉', '🥕', '🌽'];
+
+    var ws = null;
+    var myName = null;
+    var myRole = null;
+    var opponentName = null;
+    var roster = [];
+    var pendingInvite = null;
+
+    function $(id) { return document.getElementById(id); }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    function gameName(id) { return ({ memory: 'Memory' })[id] || id; }
+
+    function valueToEmoji(v) { return EMOJI[v % EMOJI.length]; }
+
+    function send(obj) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj)); }
+
+    function show(viewId) {
+        ['view-connect', 'view-lobby', 'view-game'].forEach(function (id) {
+            $(id).classList.toggle('hidden', id !== viewId);
+        });
+    }
+
+    function addChat(from, text, kind) {
+        var log = $('chat-log');
+        var div = document.createElement('div');
+        div.className = 'chat-msg';
+        if (from === 'system') div.classList.add('system');
+        if (kind === 'result') div.classList.add('result');
+        var fromLabel = from === 'system' ? '' : escapeHtml(from) + ': ';
+        div.innerHTML = '<span class="from">' + fromLabel + '</span>' + escapeHtml(text);
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function renderRoster() {
+        var list = $('roster-list');
+        list.innerHTML = '';
+        roster.forEach(function (u) {
+            var li = document.createElement('li');
+            var me = u.name === myName;
+            var busy = u.status === 'in_game';
+            li.innerHTML = '<span class="name">' + escapeHtml(u.name) + (me ? ' (you)' : '') + '</span>' +
+                '<span class="badge ' + (busy ? 'in-game' : '') + '">' + (busy ? 'in game' : 'lobby') + '</span>';
+            if (!me && !busy) {
+                var btn = document.createElement('button');
+                btn.className = 'secondary';
+                btn.textContent = 'Invite';
+                btn.onclick = function () { send({ type: 'invite', opponent: u.name, game: 'memory' }); };
+                li.appendChild(btn);
+            }
+            list.appendChild(li);
+        });
+        $('lobby-me').textContent = 'You are ' + myName;
+    }
+
+    function upsertRoster(name, status) {
+        var existing = null;
+        roster.forEach(function (u) { if (u.name === name) existing = u; });
+        if (existing) existing.status = status;
+        else roster.push({ name: name, status: status });
+        renderRoster();
+    }
+
+    function removeRoster(name) {
+        roster = roster.filter(function (u) { return u.name !== name; });
+        renderRoster();
+    }
+
+    function showInvite(msg) {
+        pendingInvite = { from: msg.from, game: msg.game };
+        $('invite-text').textContent = msg.from + ' invites you to play ' + gameName(msg.game);
+        $('invite-toast').classList.remove('hidden');
+    }
+
+    function hideInvite() {
+        pendingInvite = null;
+        $('invite-toast').classList.add('hidden');
+    }
+
+    function startDuel(msg) {
+        myRole = msg.role;
+        opponentName = msg.opponent;
+        hideInvite();
+        $('game-title').textContent = gameName(msg.game) + ' vs ' + msg.opponent;
+        show('view-game');
+    }
+
+    function endDuel(msg) {
+        myRole = null;
+        opponentName = null;
+        $('board').innerHTML = '';
+        show('view-lobby');
+        if (msg && msg.reason === 'opponent_left') addChat('system', 'Your opponent left the game.');
+    }
+
+    function renderMemory(state) {
+        var finished = state.phase === 'finished';
+        var myTurn = state.turn === myRole;
+        var canFlip = myTurn && !finished && (state.phase === 'awaiting_first' || state.phase === 'awaiting_second');
+
+        $('turn-indicator').textContent = finished ? 'Game over' : (myTurn ? 'Your turn' : opponentName + "'s turn");
+
+        var p1 = state.scores.player1, p2 = state.scores.player2;
+        var myScore = myRole === 'player1' ? p1 : p2;
+        var oppScore = myRole === 'player1' ? p2 : p1;
+        $('scoreboard').textContent = 'You ' + myScore + ' - ' + oppScore + ' ' + opponentName;
+
+        var banner = $('winner-banner');
+        if (finished) {
+            banner.textContent = state.winner === null ? "It's a tie!" : (state.winner === myRole ? 'You win!' : opponentName + ' wins!');
+            banner.classList.remove('hidden');
+        } else {
+            banner.classList.add('hidden');
+        }
+
+        var board = $('board');
+        board.style.gridTemplateColumns = 'repeat(' + state.cols + ', 1fr)';
+        board.innerHTML = '';
+        state.board.forEach(function (card) {
+            var el = document.createElement('div');
+            el.className = 'card';
+            if (card.matched) el.classList.add('matched');
+            if (card.faceUp) el.classList.add('faceup');
+            var revealed = card.faceUp || card.matched;
+            el.textContent = revealed ? valueToEmoji(card.value) : '?';
+            if (!revealed && canFlip) {
+                el.classList.add('flippable');
+                el.onclick = function () { send({ type: 'game_move', move: { action: 'flip', position: card.position } }); };
+            }
+            board.appendChild(el);
+        });
+    }
+
+    function onMessage(e) {
+        var msg;
+        try { msg = JSON.parse(e.data); } catch (err) { return; }
+
+        switch (msg.type) {
+            case 'welcome':
+                myName = msg.name;
+                roster = msg.lobby_users || [];
+                renderRoster();
+                show('view-lobby');
+                break;
+            case 'lobby_history':
+                (msg.messages || []).forEach(function (m) { addChat(m.from, m.text, m.kind); });
+                break;
+            case 'user_joined':
+                upsertRoster(msg.name, 'lobby');
+                addChat('system', msg.name + ' joined the lobby');
+                break;
+            case 'user_left':
+                removeRoster(msg.name);
+                addChat('system', msg.name + ' left');
+                break;
+            case 'user_status':
+                upsertRoster(msg.name, msg.status);
+                break;
+            case 'chat':
+                addChat(msg.from, msg.text, msg.kind);
+                break;
+            case 'invite':
+                showInvite(msg);
+                break;
+            case 'invite_sent':
+                addChat('system', 'Invite sent to ' + msg.to);
+                break;
+            case 'invite_declined':
+                addChat('system', msg.by + ' declined your invite');
+                break;
+            case 'invite_cancelled':
+                if (msg.to) addChat('system', 'Your invite to ' + msg.to + ' was cancelled');
+                else hideInvite();
+                break;
+            case 'duel_start':
+                startDuel(msg);
+                break;
+            case 'state':
+                if (msg.state && msg.state.game === 'memory') renderMemory(msg.state);
+                break;
+            case 'game_over':
+                break;
+            case 'duel_ended':
+                endDuel(msg);
+                break;
+            case 'error':
+                addChat('system', 'Error: ' + msg.message);
+                break;
+        }
+    }
+
+    function onClose() {
+        show('view-connect');
+        $('connect-status').textContent = myName ? 'Disconnected.' : '';
+        myName = null;
+        myRole = null;
+        opponentName = null;
+        roster = [];
+        hideInvite();
+    }
+
+    function connect() {
+        var name = $('name-input').value.trim() || ('Guest' + Math.floor(Math.random() * 9000 + 1000));
+        $('connect-status').textContent = 'Connecting…';
+        ws = new WebSocket('ws://' + location.host + '/ws?name=' + encodeURIComponent(name));
+        ws.onmessage = onMessage;
+        ws.onclose = onClose;
+        ws.onerror = function () { $('connect-status').textContent = 'Connection error.'; };
+    }
+
+    $('connect-btn').onclick = connect;
+    $('name-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') connect(); });
+    $('chat-form').onsubmit = function (e) {
+        e.preventDefault();
+        var input = $('chat-input');
+        var text = input.value.trim();
+        if (text) { send({ type: 'chat', text: text }); input.value = ''; }
+    };
+    $('invite-accept').onclick = function () {
+        if (pendingInvite) send({ type: 'accept_invite', from: pendingInvite.from });
+        hideInvite();
+    };
+    $('invite-decline').onclick = function () {
+        if (pendingInvite) send({ type: 'decline_invite', from: pendingInvite.from });
+        hideInvite();
+    };
+    $('leave-btn').onclick = function () { send({ type: 'leave_game' }); };
+})();
+</script>
 </body>
 </html>

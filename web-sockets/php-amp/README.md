@@ -148,9 +148,12 @@ The `state` payload carries `cols`, `rows`, `phase` (`awaiting_first` /
 ## Testing
 
 ```bash
-php test/run.php          # run all unit tests
-php test/InfraTest.php    # transport/lobby unit tests (no server needed)
+php test/run.php                # all unit tests (no server needed)
+php test/integration_test.php   # end-to-end: lobby -> duel -> result (spawns a server)
 ```
 
 Unit tests use plain closures instead of real sockets, so they run without a
-server.
+server. The integration test spawns `server.php` on a temporary port, connects
+real WebSocket clients, and plays a full Memory game to completion via a small
+solver, asserting lobby chat, invite/accept, turn enforcement, hidden card
+values, and result publication to the lobby.

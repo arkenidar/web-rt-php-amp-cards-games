@@ -43,6 +43,8 @@
     .card.flippable:hover { transform:scale(1.04); }
     .card.faceup { background:#f2f4fb; color:#111; }
     .card.matched { background:var(--ok); color:#fff; opacity:0.75; }
+    #game-log { margin-top:1rem; background:var(--panel); border-radius:8px; padding:0.6rem 0.8rem; max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:0.25rem; }
+    .log-line { font-size:0.85rem; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -81,6 +83,7 @@
         </div>
         <div id="winner-banner" class="hidden"></div>
         <div id="board"></div>
+        <div id="game-log"></div>
     </div>
 
     <div id="invite-toast" class="hidden">
@@ -115,6 +118,17 @@
     function gameName(id) { return ({ memory: 'Memory' })[id] || id; }
 
     function valueToEmoji(v) { return EMOJI[v % EMOJI.length]; }
+
+    function gameLog(text) {
+        var log = $('game-log');
+        var div = document.createElement('div');
+        div.className = 'log-line';
+        div.textContent = text;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function actorName(role) { return role === myRole ? myName : opponentName; }
 
     function send(obj) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj)); }
 
@@ -186,6 +200,7 @@
         opponentName = msg.opponent;
         hideInvite();
         $('game-title').textContent = gameName(msg.game) + ' vs ' + msg.opponent;
+        $('game-log').innerHTML = '';
         show('view-game');
     }
 
@@ -279,10 +294,20 @@
             case 'duel_start':
                 startDuel(msg);
                 break;
+            case 'action':
+                if (msg.action === 'flip') gameLog(actorName(msg.role) + ' flipped card #' + msg.position);
+                break;
+            case 'match':
+                gameLog(actorName(msg.player) + ' matched a pair!');
+                break;
+            case 'mismatch':
+                gameLog('No match - cards flipped back.');
+                break;
             case 'state':
                 if (msg.state && msg.state.game === 'memory') renderMemory(msg.state);
                 break;
             case 'game_over':
+                gameLog('Game over.');
                 break;
             case 'duel_ended':
                 endDuel(msg);

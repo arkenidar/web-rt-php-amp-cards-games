@@ -124,12 +124,16 @@ Game move:
 {"type":"game_move","move":{"action":"flip","position":7}}
 ```
 
-Game events:
+Game events (broadcast to both players):
 
 ```json
+{"type":"action","role":"player1","action":"flip","position":7}
 {"type":"match","player":"player1","positions":[7,9]}
 {"type":"mismatch","positions":[7,9]}
 ```
+
+Every move is announced as an `action` event (and its result as `match` /
+`mismatch` plus a new `state`), so each player sees the other's actions.
 
 The `state` payload carries `cols`, `rows`, `phase` (`awaiting_first` /
 `awaiting_second` / `resolving` / `finished`), `turn`, `scores`, `flipped`, and

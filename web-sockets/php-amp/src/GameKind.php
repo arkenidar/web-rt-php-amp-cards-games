@@ -13,6 +13,7 @@ namespace DuelGame;
  *
  * Event shape:
  *   ['type' => 'state']                  // DuelSession fills in stateFor() per role
+ *   ['type' => 'action', ...]            // a player's move, broadcast to all players
  *   ['type' => 'match', ...]             // broadcast to both players
  *   ['type' => 'error', 'to' => ['player1'], ...]  // optional "to" limits delivery
  */

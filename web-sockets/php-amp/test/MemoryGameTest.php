@@ -28,7 +28,7 @@ $runner->test('flip reveals exactly one card', function () {
     $game = new MemoryGame(2, [0, 0, 1, 1]);
     $events = $game->handleMove('player1', ['action' => 'flip', 'position' => 0]);
 
-    assert_same(['state'], array_column($events, 'type'));
+    assert_same(['action', 'state'], array_column($events, 'type'));
 
     $state = $game->stateFor('player1');
     assert_true($state['board'][0]['faceUp']);
@@ -59,7 +59,7 @@ $runner->test('a match scores and keeps the turn', function () {
     $game->handleMove('player1', ['action' => 'flip', 'position' => 0]);
     $events = $game->handleMove('player1', ['action' => 'flip', 'position' => 1]);
 
-    assert_same(['match', 'state'], array_column($events, 'type'));
+    assert_same(['action', 'match', 'state'], array_column($events, 'type'));
 
     $state = $game->stateFor('player1');
     assert_same(1, $state['scores']['player1']);
@@ -74,7 +74,7 @@ $runner->test('a mismatch resolves and passes the turn', function () {
     $game->handleMove('player1', ['action' => 'flip', 'position' => 0]);
     $events = $game->handleMove('player1', ['action' => 'flip', 'position' => 1]);
 
-    assert_same(['state'], array_column($events, 'type'), 'mismatch reveals both cards');
+    assert_same(['action', 'state'], array_column($events, 'type'), 'mismatch reveals both cards');
     assert_true($game->needsResolution());
 
     $resolved = $game->resolve();
@@ -96,7 +96,7 @@ $runner->test('a full game completes with a winner', function () {
     $game->handleMove('player1', ['action' => 'flip', 'position' => 2]);
     $events = $game->handleMove('player1', ['action' => 'flip', 'position' => 3]); // match, game over
 
-    assert_same('match', $events[0]['type']);
+    assert_same('match', $events[1]['type']);
     assert_true($game->isOver());
 
     $result = $game->result();

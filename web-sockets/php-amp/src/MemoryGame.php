@@ -112,10 +112,12 @@ final class MemoryGame implements GameKind
         $this->cards[$position]['faceUp'] = true;
         $this->flipped[] = $position;
 
+        $action = ['type' => 'action', 'role' => $role, 'action' => 'flip', 'position' => $position];
+
         if (count($this->flipped) === 1) {
             $this->phase = self::PHASE_AWAITING_SECOND;
 
-            return [['type' => 'state']];
+            return [$action, ['type' => 'state']];
         }
 
         [$a, $b] = $this->flipped;
@@ -134,6 +136,7 @@ final class MemoryGame implements GameKind
             }
 
             return [
+                $action,
                 ['type' => 'match', 'player' => $role, 'positions' => [$a, $b]],
                 ['type' => 'state'],
             ];
@@ -142,7 +145,7 @@ final class MemoryGame implements GameKind
         $this->phase = self::PHASE_RESOLVING;
         $this->pendingMismatch = true;
 
-        return [['type' => 'state']];
+        return [$action, ['type' => 'state']];
     }
 
     public function needsResolution(): bool

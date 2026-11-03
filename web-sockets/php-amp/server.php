@@ -30,7 +30,7 @@ $server->expose(new Socket\InternetAddress($host, $port));
 $errorHandler = new DefaultErrorHandler();
 
 $games = new GameRegistry();
-// Game kinds are registered here (MemoryGame in a later step).
+$games->register('memory', fn () => new \DuelGame\MemoryGame(8));
 
 $lobby = new Lobby($games, new SessionManager(), $resolveDelay);
 

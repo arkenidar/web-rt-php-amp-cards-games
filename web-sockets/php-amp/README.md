@@ -47,6 +47,7 @@ server.php                 Bootstrap: HTTP server + Router + Websocket + static 
 src/
   GameKind.php             Interface every game kind implements (pure game logic)
   GameRegistry.php         Maps game-kind id -> factory
+  MemoryGame.php           Game kind 1: Memory (concentration)
   Player.php               Application wrapper around a WebSocket connection
   Lobby.php                Roster, chat, invites, session lifecycle, results
   DuelSession.php          Generic 2-player session: routes moves/events
@@ -109,13 +110,39 @@ test/                      Tests
 - Invites have **no timeout** and can be left unanswered.
 - Disconnecting or entering a game cancels any outstanding invites.
 
+## Game kinds
+
+### Memory (`memory`)
+
+A 4×4 board of 8 hidden pairs. Players alternate flipping two cards per turn: a
+match scores a point and keeps the turn; a mismatch flips back (after a short
+reveal window) and passes the turn. The game ends when all pairs are matched.
+
+Game move:
+
+```json
+{"type":"game_move","move":{"action":"flip","position":7}}
+```
+
+Game events:
+
+```json
+{"type":"match","player":"player1","positions":[7,9]}
+{"type":"mismatch","positions":[7,9]}
+```
+
+The `state` payload carries `cols`, `rows`, `phase` (`awaiting_first` /
+`awaiting_second` / `resolving` / `finished`), `turn`, `scores`, `flipped`, and
+`board` (each cell has `position`, `faceUp`, `matched`, and `value` — `value` is
+`null` while face-down).
+
 ## Adding a game kind
 
-1. Implement `DuelGame\GameKind` (e.g. `src/MemoryGame.php`).
+1. Implement `DuelGame\GameKind` (e.g. `src/BattleCardsGame.php`).
 2. Register it in `server.php`:
 
    ```php
-   $games->register('memory', fn () => new \DuelGame\MemoryGame());
+   $games->register('battle', fn () => new \DuelGame\BattleCardsGame());
    ```
 
 ## Testing
